@@ -12,9 +12,15 @@ tasks = []
 def load_tasks():
     global tasks
     if os.path.exists(FILE_NAME):
-        with open(FILE_NAME, "r", encoding="utf-8") as f:
-            tasks = json.load(f)
-            update_listbox()
+        try:
+            with open(FILE_NAME, "r", encoding="utf-8") as f:
+                tasks = json.load(f)
+        except:
+            tasks = []
+    else:
+        tasks = []
+
+    update_listbox()
 
 def save_tasks():
     with open(FILE_NAME, "w", encoding="utf-8") as f:
