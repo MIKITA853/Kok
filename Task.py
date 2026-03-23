@@ -2,8 +2,9 @@ import json
 import os
 import tkinter as tk
 from datetime import datetime
-from tkinter import filedialog, messagebox
+from tkinter import messagebox
 
+# ===== НАСТРОЙКИ =====
 FILE_NAME = "tasks.json"
 DATE_FORMAT = "%d-%m-%Y"
 
@@ -23,7 +24,6 @@ COLORS = {
 }
 
 tasks = []
-selected_task_index = None
 current_filter = "all"
 
 # ===== DATA =====
@@ -60,7 +60,7 @@ def save_tasks():
     with open(FILE_NAME, "w", encoding="utf-8") as f:
         json.dump(tasks, f, ensure_ascii=False, indent=4)
 
-# ===== LOGIC =====
+# ===== ЛОГИКА =====
 def get_visible():
     result = []
     for i, t in enumerate(tasks):
@@ -76,6 +76,7 @@ def add_task():
     deadline = deadline_entry.get().strip() or "без срока"
 
     if not text:
+        messagebox.showwarning("Ошибка", "Введите задачу")
         return
 
     tasks.append({
@@ -113,17 +114,24 @@ def clear_tasks():
         w.destroy()
 
 def create_card(i, task):
-    bg = COLORS["hover"] if i == selected_task_index else COLORS["card"]
-
-    frame = tk.Frame(task_container, bg=bg, padx=10, pady=10)
+    frame = tk.Frame(task_container, bg=COLORS["card"], padx=10, pady=10)
     frame.pack(fill="x", pady=5)
+
+    # hover эффект
+    def on_enter(e):
+        frame.configure(bg=COLORS["hover"])
+    def on_leave(e):
+        frame.configure(bg=COLORS["card"])
+
+    frame.bind("<Enter>", on_enter)
+    frame.bind("<Leave>", on_leave)
 
     color = COLORS["danger"] if is_overdue(task) else COLORS["text"]
 
     tk.Label(
         frame,
         text=task["text"],
-        bg=bg,
+        bg=COLORS["card"],
         fg=color,
         font=("Segoe UI", 12, "bold"),
         anchor="w"
@@ -132,18 +140,28 @@ def create_card(i, task):
     tk.Label(
         frame,
         text=f"{task['category']} | {task['deadline']} | {task['priority']}",
-        bg=bg,
+        bg=COLORS["card"],
         fg=COLORS["muted"]
     ).pack(fill="x")
 
-    btns = tk.Frame(frame, bg=bg)
+    btns = tk.Frame(frame, bg=COLORS["card"])
     btns.pack(anchor="e")
 
-    tk.Button(btns, text="✔", bg=COLORS["accent"], command=lambda: toggle_task(i)).pack(side="right", padx=3)
-    tk.Button(btns, text="✖", bg=COLORS["accent"], command=lambda: delete_task(i)).pack(side="right", padx=3)
+    tk.Button(
+        btns, text="✔",
+        bg=COLORS["accent"],
+        command=lambda: toggle_task(i)
+    ).pack(side="right", padx=3)
+
+    tk.Button(
+        btns, text="✖",
+        bg=COLORS["accent"],
+        command=lambda: delete_task(i)
+    ).pack(side="right", padx=3)
 
 def refresh_ui():
     clear_tasks()
+
     for i, t in get_visible():
         create_card(i, t)
 
@@ -153,7 +171,7 @@ def refresh_ui():
 
     stats_var.set(f"Всего: {total} | Выполнено: {done} | {percent}%")
 
-# ===== WINDOW =====
+# ===== ОКНО =====
 root = tk.Tk()
 root.title("Task Manager")
 root.geometry("900x600")
@@ -162,13 +180,17 @@ root.configure(bg=COLORS["bg"])
 root.grid_columnconfigure(1, weight=1)
 root.grid_rowconfigure(0, weight=1)
 
-# SIDEBAR
+# ===== SIDEBAR =====
 sidebar = tk.Frame(root, bg=COLORS["sidebar"], width=200)
 sidebar.grid(row=0, column=0, sticky="ns")
 
-tk.Label(sidebar, text="Task Manager",
-         bg=COLORS["sidebar"], fg=COLORS["text"],
-         font=("Segoe UI", 16, "bold")).pack(pady=20)
+tk.Label(
+    sidebar,
+    text="Task Manager",
+    bg=COLORS["sidebar"],
+    fg=COLORS["text"],
+    font=("Segoe UI", 16, "bold")
+).pack(pady=20)
 
 tk.Button(sidebar, text="Все", bg=COLORS["accent"],
           command=lambda: set_filter("all")).pack(fill="x", padx=10, pady=5)
@@ -179,7 +201,7 @@ tk.Button(sidebar, text="Выполненные", bg=COLORS["accent"],
 tk.Button(sidebar, text="Невыполненные", bg=COLORS["accent"],
           command=lambda: set_filter("todo")).pack(fill="x", padx=10, pady=5)
 
-# MAIN
+# ===== MAIN =====
 main = tk.Frame(root, bg=COLORS["bg"])
 main.grid(row=0, column=1, sticky="nsew")
 
@@ -200,7 +222,12 @@ priority_var = tk.StringVar(value="Средний")
 tk.OptionMenu(top, category_var, *CATEGORIES).pack(side="left", padx=5)
 tk.OptionMenu(top, priority_var, *PRIORITIES).pack(side="left", padx=5)
 
-tk.Button(top, text="Добавить", bg=COLORS["accent"], command=add_task).pack(side="left", padx=5)
+tk.Button(
+    top,
+    text="Добавить",
+    bg=COLORS["accent"],
+    command=add_task
+).pack(side="left", padx=5)
 
 # TASKS
 task_container = tk.Frame(main, bg=COLORS["bg"])
@@ -208,9 +235,13 @@ task_container.pack(fill="both", expand=True, padx=10)
 
 # STATS
 stats_var = tk.StringVar()
-tk.Label(main, textvariable=stats_var,
-         bg=COLORS["bg"], fg=COLORS["text"]).pack(pady=10)
+tk.Label(
+    main,
+    textvariable=stats_var,
+    bg=COLORS["bg"],
+    fg=COLORS["text"]
+).pack(pady=10)
 
-# START
+# ===== СТАРТ =====
 load_tasks()
 root.mainloop()
