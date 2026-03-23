@@ -13,17 +13,16 @@ PRIORITIES = ["Высокий", "Средний", "Низкий"]
 
 COLORS = {
     "bg": "#0f172a",
-    "sidebar": "#1e293b",
     "card": "#1e293b",
-    "hover": "#2563eb",
-    "accent": "#3b82f6",
+    "input": "#0b1220",
+    "accent": "#6366f1",
+    "hover": "#4f46e5",
     "text": "#e2e8f0",
     "muted": "#94a3b8",
     "danger": "#ef4444",
 }
 
 tasks = []
-current_filter = "all"
 
 # ===== DATA =====
 def normalize_task(raw):
@@ -92,35 +91,20 @@ def delete_task(i):
     save_tasks()
     refresh_ui()
 
-def set_filter(mode):
-    global current_filter
-    current_filter = mode
-    refresh_ui()
-
-def get_visible_tasks():
-    result = []
-    for i, t in enumerate(tasks):
-        if current_filter == "done" and not t["done"]:
-            continue
-        if current_filter == "todo" and t["done"]:
-            continue
-        result.append((i, t))
-    return result
-
 # ===== UI =====
 def clear_tasks():
     for w in task_container.winfo_children():
         w.destroy()
 
 def create_card(i, task):
-    frame = tk.Frame(task_container, bg=COLORS["card"], padx=12, pady=10)
+    frame = tk.Frame(task_container, bg="#273449", padx=14, pady=12)
     frame.pack(fill="x", pady=6)
 
     def on_enter(e):
         frame.configure(bg=COLORS["hover"])
 
     def on_leave(e):
-        frame.configure(bg=COLORS["card"])
+        frame.configure(bg="#273449")
 
     frame.bind("<Enter>", on_enter)
     frame.bind("<Leave>", on_leave)
@@ -130,32 +114,32 @@ def create_card(i, task):
     tk.Label(
         frame,
         text=task["text"],
-        bg=COLORS["card"],
+        bg=frame["bg"],
         fg=color,
-        font=("Segoe UI", 12, "bold"),
+        font=("Segoe UI", 13, "bold"),
         anchor="w"
     ).pack(fill="x")
 
     tk.Label(
         frame,
         text=f"{task['category']} | {task['deadline']} | {task['priority']}",
-        bg=COLORS["card"],
+        bg=frame["bg"],
         fg=COLORS["muted"]
-    ).pack(fill="x")
+    ).pack(fill="x", pady=(2, 6))
 
-    btns = tk.Frame(frame, bg=COLORS["card"])
+    btns = tk.Frame(frame, bg=frame["bg"])
     btns.pack(anchor="e")
 
     tk.Button(btns, text="✔", bg=COLORS["accent"], fg="white",
-              command=lambda: toggle_task(i)).pack(side="right", padx=3)
+              bd=0, command=lambda: toggle_task(i)).pack(side="right", padx=4)
 
     tk.Button(btns, text="✖", bg=COLORS["accent"], fg="white",
-              command=lambda: delete_task(i)).pack(side="right", padx=3)
+              bd=0, command=lambda: delete_task(i)).pack(side="right", padx=4)
 
 def refresh_ui():
     clear_tasks()
 
-    for i, t in get_visible_tasks():
+    for i, t in enumerate(tasks):
         create_card(i, t)
 
     total = len(tasks)
@@ -167,60 +151,72 @@ def refresh_ui():
 # ===== ОКНО =====
 root = tk.Tk()
 root.title("Task Manager")
-root.geometry("1000x700")
+root.geometry("1100x800")
 root.configure(bg=COLORS["bg"])
 
-root.grid_columnconfigure(1, weight=1)
-root.grid_rowconfigure(0, weight=1)
+# ===== ЦЕНТРАЛЬНАЯ КАРТОЧКА =====
+container = tk.Frame(
+    root,
+    bg=COLORS["card"],
+    padx=25,
+    pady=25,
+    highlightthickness=1,
+    highlightbackground="#334155"
+)
 
-# ===== SIDEBAR =====
-sidebar = tk.Frame(root, bg=COLORS["sidebar"], width=200)
-sidebar.grid(row=0, column=0, sticky="ns")
+container.place(relx=0.5, rely=0.5, anchor="center", width=800, height=700)
 
-tk.Label(sidebar, text="Task Manager", bg=COLORS["sidebar"],
-         fg=COLORS["text"], font=("Segoe UI", 16, "bold")).pack(pady=20)
+# ===== TITLE =====
+tk.Label(
+    container,
+    text="Task Manager",
+    bg=COLORS["card"],
+    fg=COLORS["text"],
+    font=("Segoe UI", 20, "bold")
+).pack(pady=(0, 15))
 
-tk.Button(sidebar, text="Все", bg=COLORS["accent"],
-          command=lambda: set_filter("all")).pack(fill="x", padx=10, pady=5)
+# ===== INPUTS =====
+entry = tk.Entry(container, bg=COLORS["input"], fg=COLORS["text"],
+                 insertbackground="white", bd=0, font=("Segoe UI", 12))
+entry.pack(fill="x", pady=5)
 
-tk.Button(sidebar, text="Выполненные", bg=COLORS["accent"],
-          command=lambda: set_filter("done")).pack(fill="x", padx=10, pady=5)
-
-tk.Button(sidebar, text="Невыполненные", bg=COLORS["accent"],
-          command=lambda: set_filter("todo")).pack(fill="x", padx=10, pady=5)
-
-# ===== MAIN =====
-main = tk.Frame(root, bg=COLORS["bg"])
-main.grid(row=0, column=1, sticky="nsew")
-
-# TOP
-top = tk.Frame(main, bg=COLORS["bg"])
-top.pack(fill="x", pady=10)
-
-entry = tk.Entry(top)
-entry.pack(side="left", fill="x", expand=True, padx=5)
-
-deadline_entry = tk.Entry(top, width=15)
-deadline_entry.pack(side="left", padx=5)
+deadline_entry = tk.Entry(container, bg=COLORS["input"], fg=COLORS["text"],
+                          bd=0, font=("Segoe UI", 12))
+deadline_entry.pack(fill="x", pady=5)
 deadline_entry.insert(0, "дд-мм-гггг")
 
 category_var = tk.StringVar(value="Личное")
 priority_var = tk.StringVar(value="Средний")
 
-tk.OptionMenu(top, category_var, *CATEGORIES).pack(side="left", padx=5)
-tk.OptionMenu(top, priority_var, *PRIORITIES).pack(side="left", padx=5)
+row = tk.Frame(container, bg=COLORS["card"])
+row.pack(fill="x", pady=5)
 
-tk.Button(top, text="Добавить", bg=COLORS["accent"],
-          command=add_task).pack(side="left", padx=5)
+tk.OptionMenu(row, category_var, *CATEGORIES).pack(side="left", padx=5)
+tk.OptionMenu(row, priority_var, *PRIORITIES).pack(side="left", padx=5)
 
-# TASKS
-task_container = tk.Frame(main, bg=COLORS["bg"])
-task_container.pack(fill="both", expand=True, padx=10)
+tk.Button(
+    container,
+    text="Добавить",
+    bg=COLORS["accent"],
+    fg="white",
+    bd=0,
+    font=("Segoe UI", 12),
+    command=add_task
+).pack(fill="x", pady=10)
 
-# STATS
+# ===== TASKS =====
+task_container = tk.Frame(container, bg=COLORS["card"])
+task_container.pack(fill="both", expand=True, pady=10)
+
+# ===== STATS =====
 stats_var = tk.StringVar()
-tk.Label(main, textvariable=stats_var,
-         bg=COLORS["bg"], fg=COLORS["text"]).pack(pady=10)
+tk.Label(
+    container,
+    textvariable=stats_var,
+    bg=COLORS["card"],
+    fg=COLORS["muted"],
+    font=("Segoe UI", 11)
+).pack(pady=5)
 
 # ===== СТАРТ =====
 load_tasks()
