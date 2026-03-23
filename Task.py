@@ -3,6 +3,7 @@ import os
 import tkinter as tk
 from datetime import datetime
 from tkinter import messagebox
+from tkcalendar import DateEntry
 
 FILE_NAME = "tasks.json"
 DATE_FORMAT = "%d-%m-%Y"
@@ -24,31 +25,12 @@ COLORS = {
 tasks = []
 
 # ===== DATA =====
-def normalize_task(raw):
-    return {
-        "text": raw.get("text", ""),
-        "done": raw.get("done", False),
-        "deadline": raw.get("deadline", "без срока"),
-        "category": raw.get("category", "Личное"),
-        "priority": raw.get("priority", "Средний"),
-    }
-
-def parse_deadline(text):
-    try:
-        return datetime.strptime(text, DATE_FORMAT).date()
-    except:
-        return None
-
-def is_overdue(task):
-    d = parse_deadline(task["deadline"])
-    return d and not task["done"] and d < datetime.now().date()
-
 def load_tasks():
     global tasks
     if os.path.exists(FILE_NAME):
         try:
             with open(FILE_NAME, "r", encoding="utf-8") as f:
-                tasks = [normalize_task(t) for t in json.load(f)]
+                tasks = json.load(f)
         except:
             tasks = []
     refresh_ui()
@@ -57,27 +39,32 @@ def save_tasks():
     with open(FILE_NAME, "w", encoding="utf-8") as f:
         json.dump(tasks, f, ensure_ascii=False, indent=4)
 
-# ===== ЛОГИКА =====
+def is_overdue(task):
+    try:
+        d = datetime.strptime(task["deadline"], DATE_FORMAT).date()
+        return not task["done"] and d < datetime.now().date()
+    except:
+        return False
+
+# ===== LOGIC =====
 def add_task():
     text = entry.get().strip()
-    deadline = deadline_entry.get().strip() or "без срока"
-
     if not text:
         messagebox.showwarning("Ошибка", "Введите задачу")
         return
 
-    tasks.append({
+    task = {
         "text": text,
         "done": False,
-        "deadline": deadline,
+        "deadline": date_entry.get(),
         "category": category_var.get(),
         "priority": priority_var.get()
-    })
+    }
+
+    tasks.append(task)
+    save_tasks()
 
     entry.delete(0, tk.END)
-    deadline_entry.delete(0, tk.END)
-
-    save_tasks()
     refresh_ui()
 
 def toggle_task(i):
@@ -99,25 +86,23 @@ def create_card(i, task):
     frame = tk.Frame(inner_frame, bg="#273449", padx=14, pady=12)
     frame.pack(fill="x", pady=6, padx=10)
 
-    def on_enter(e):
-        frame.configure(bg=COLORS["hover"])
-
-    def on_leave(e):
-        frame.configure(bg="#273449")
-
-    frame.bind("<Enter>", on_enter)
-    frame.bind("<Leave>", on_leave)
-
     color = COLORS["danger"] if is_overdue(task) else COLORS["text"]
 
-    tk.Label(frame, text=task["text"],
-             bg=frame["bg"], fg=color,
-             font=("Segoe UI", 13, "bold"),
-             anchor="w").pack(fill="x")
+    tk.Label(
+        frame,
+        text=task["text"],
+        bg=frame["bg"],
+        fg=color,
+        font=("Segoe UI", 13, "bold"),
+        anchor="w"
+    ).pack(fill="x")
 
-    tk.Label(frame,
-             text=f"{task['category']} | {task['deadline']} | {task['priority']}",
-             bg=frame["bg"], fg=COLORS["muted"]).pack(fill="x", pady=(2, 6))
+    tk.Label(
+        frame,
+        text=f"{task['category']} | {task['deadline']} | {task['priority']}",
+        bg=frame["bg"],
+        fg=COLORS["muted"]
+    ).pack(fill="x", pady=(2, 6))
 
     btns = tk.Frame(frame, bg=frame["bg"])
     btns.pack(anchor="e")
@@ -140,27 +125,31 @@ def refresh_ui():
 
     stats_var.set(f"Всего: {total} | Выполнено: {done} | {percent}%")
 
-# ===== ОКНО =====
+# ===== WINDOW =====
 root = tk.Tk()
 root.title("Task Manager")
 root.geometry("1100x800")
 root.configure(bg=COLORS["bg"])
 
+# ===== CENTER CONTAINER =====
 container = tk.Frame(root, bg=COLORS["card"], padx=25, pady=25)
-container.place(relx=0.5, rely=0.5, anchor="center", width=800, height=700)
+container.place(relx=0.5, rely=0.5, anchor="center", width=850, height=720)
 
+# TITLE
 tk.Label(container, text="Task Manager",
          bg=COLORS["card"], fg=COLORS["text"],
          font=("Segoe UI", 20, "bold")).pack(pady=10)
 
+# INPUT
 entry = tk.Entry(container, bg=COLORS["input"], fg=COLORS["text"],
-                 insertbackground="white", bd=0)
+                 insertbackground="white", bd=0, font=("Segoe UI", 12))
 entry.pack(fill="x", pady=5)
 
-deadline_entry = tk.Entry(container, bg=COLORS["input"], fg=COLORS["text"], bd=0)
-deadline_entry.pack(fill="x", pady=5)
-deadline_entry.insert(0, "дд-мм-гггг")
+# DATE PICKER
+date_entry = DateEntry(container, date_pattern="dd-mm-yyyy")
+date_entry.pack(fill="x", pady=5)
 
+# SELECTORS
 category_var = tk.StringVar(value="Личное")
 priority_var = tk.StringVar(value="Средний")
 
@@ -170,11 +159,13 @@ row.pack(pady=5)
 tk.OptionMenu(row, category_var, *CATEGORIES).pack(side="left", padx=5)
 tk.OptionMenu(row, priority_var, *PRIORITIES).pack(side="left", padx=5)
 
+# BUTTON
 tk.Button(container, text="Добавить",
           bg=COLORS["accent"], fg="white",
-          bd=0, command=add_task).pack(fill="x", pady=10)
+          bd=0, font=("Segoe UI", 12),
+          command=add_task).pack(fill="x", pady=10)
 
-# ===== СКРОЛЛ =====
+# ===== SCROLLABLE TASKS =====
 canvas = tk.Canvas(container, bg=COLORS["card"], highlightthickness=0)
 scrollbar = tk.Scrollbar(container, orient="vertical", command=canvas.yview)
 
@@ -191,10 +182,11 @@ canvas.configure(yscrollcommand=scrollbar.set)
 canvas.pack(side="left", fill="both", expand=True)
 scrollbar.pack(side="right", fill="y")
 
-# ===== STATS =====
+# STATS
 stats_var = tk.StringVar()
 tk.Label(container, textvariable=stats_var,
          bg=COLORS["card"], fg=COLORS["muted"]).pack(pady=5)
 
+# START
 load_tasks()
 root.mainloop()
