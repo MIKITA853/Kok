@@ -1,206 +1,182 @@
+import tkinter as tk
+from tkinter import filedialog, messagebox
 import json
 import os
-import tkinter as tk
 from datetime import datetime
-from tkinter import messagebox
 
-# Попытка подключить календарь
-try:
-    from tkcalendar import DateEntry
-    HAS_CALENDAR = True
-except:
-    HAS_CALENDAR = False
+# ===== ФАЙЛ =====
+FILE_NAME = "objects.json"
 
-FILE_NAME = "tasks.json"
-DATE_FORMAT = "%d-%m-%Y"
+# ===== ЦВЕТА =====
+BG = "#0f172a"
+PANEL = "#111827"
+ACCENT = "#6366f1"
+TEXT = "#e2e8f0"
 
-CATEGORIES = ["Работа", "Личное", "Учёба"]
-PRIORITIES = ["Высокий", "Средний", "Низкий"]
-
-COLORS = {
-    "bg": "#0f172a",
-    "card": "#1e293b",
-    "input": "#0b1220",
-    "accent": "#6366f1",
-    "hover": "#4f46e5",
-    "text": "#e2e8f0",
-    "muted": "#94a3b8",
-    "danger": "#ef4444",
+TYPE_COLORS = {
+    "Тип A": "#22c55e",
+    "Тип B": "#eab308",
+    "Тип C": "#ef4444",
 }
 
-tasks = []
-
-# ===== DATA =====
-def load_tasks():
-    global tasks
-    if os.path.exists(FILE_NAME):
-        try:
-            with open(FILE_NAME, "r", encoding="utf-8") as f:
-                tasks = json.load(f)
-        except:
-            tasks = []
-    refresh_ui()
-
-def save_tasks():
-    with open(FILE_NAME, "w", encoding="utf-8") as f:
-        json.dump(tasks, f, ensure_ascii=False, indent=4)
-
-def is_overdue(task):
+# ===== ДАННЫЕ =====
+def load_objects():
+    if not os.path.exists(FILE_NAME):
+        return []
     try:
-        d = datetime.strptime(task["deadline"], DATE_FORMAT).date()
-        return not task["done"] and d < datetime.now().date()
+        with open(FILE_NAME, "r", encoding="utf-8") as f:
+            return json.load(f)
     except:
-        return False
+        return []
 
-# ===== LOGIC =====
-def add_task():
-    text = entry.get().strip()
+def save_objects(objects):
+    with open(FILE_NAME, "w", encoding="utf-8") as f:
+        json.dump(objects, f, ensure_ascii=False, indent=2)
 
-    if not text:
-        messagebox.showwarning("Ошибка", "Введите задачу")
-        return
+# ===== ПРИЛОЖЕНИЕ =====
+class MapApp:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Map Simulator")
+        self.root.state("zoomed")
+        self.root.configure(bg=BG)
 
-    deadline = date_entry.get()
+        self.scale = 1.0
+        self.pan_x = 0
+        self.pan_y = 0
 
-    task = {
-        "text": text,
-        "done": False,
-        "deadline": deadline,
-        "category": category_var.get(),
-        "priority": priority_var.get()
-    }
+        self.objects = load_objects()
+        self.add_mode = True
 
-    tasks.append(task)
-    save_tasks()
+        self.build_ui()
+        self.bind_events()
+        self.refresh()
 
-    entry.delete(0, tk.END)
-    refresh_ui()
+    def build_ui(self):
+        self.toolbar = tk.Frame(self.root, bg=PANEL)
+        self.toolbar.pack(fill="x")
 
-def toggle_task(i):
-    tasks[i]["done"] = not tasks[i]["done"]
-    save_tasks()
-    refresh_ui()
+        tk.Button(self.toolbar, text="Добавление ВКЛ/ВЫКЛ",
+                  command=self.toggle_add,
+                  bg=ACCENT, fg="white").pack(side="left", padx=5)
 
-def delete_task(i):
-    tasks.pop(i)
-    save_tasks()
-    refresh_ui()
+        tk.Button(self.toolbar, text="Очистить",
+                  command=self.clear,
+                  bg=ACCENT, fg="white").pack(side="left", padx=5)
 
-# ===== UI =====
-def clear_tasks():
-    for w in inner_frame.winfo_children():
-        w.destroy()
+        tk.Button(self.toolbar, text="Загрузить карту",
+                  command=self.load_map,
+                  bg=ACCENT, fg="white").pack(side="left", padx=5)
 
-def create_card(i, task):
-    frame = tk.Frame(inner_frame, bg="#273449", padx=14, pady=12)
-    frame.pack(fill="x", pady=6, padx=10)
+        self.canvas = tk.Canvas(self.root, bg=BG)
+        self.canvas.pack(fill="both", expand=True)
 
-    color = COLORS["danger"] if is_overdue(task) else COLORS["text"]
+    def bind_events(self):
+        self.canvas.bind("<Button-1>", self.click)
+        self.canvas.bind("<MouseWheel>", self.zoom)
+        self.canvas.bind("<B2-Motion>", self.pan_move)
+        self.canvas.bind("<ButtonPress-2>", self.pan_start)
 
-    tk.Label(
-        frame,
-        text=task["text"],
-        bg=frame["bg"],
-        fg=color,
-        font=("Segoe UI", 13, "bold"),
-        anchor="w"
-    ).pack(fill="x")
+    # ===== ЛОГИКА =====
+    def toggle_add(self):
+        self.add_mode = not self.add_mode
 
-    tk.Label(
-        frame,
-        text=f"{task['category']} | {task['deadline']} | {task['priority']}",
-        bg=frame["bg"],
-        fg=COLORS["muted"]
-    ).pack(fill="x", pady=(2, 6))
+    def click(self, event):
+        if not self.add_mode:
+            return
 
-    btns = tk.Frame(frame, bg=frame["bg"])
-    btns.pack(anchor="e")
+        x, y = self.to_world(event.x, event.y)
 
-    tk.Button(btns, text="✔", bg=COLORS["accent"], fg="white",
-              bd=0, command=lambda: toggle_task(i)).pack(side="right", padx=4)
+        self.objects.append({
+            "x": x,
+            "y": y,
+            "radius": 50,
+            "type": "Тип A",
+            "name": f"obj {len(self.objects)+1}"
+        })
 
-    tk.Button(btns, text="✖", bg=COLORS["accent"], fg="white",
-              bd=0, command=lambda: delete_task(i)).pack(side="right", padx=4)
+        save_objects(self.objects)
+        self.refresh()
 
-def refresh_ui():
-    clear_tasks()
+    def clear(self):
+        if messagebox.askyesno("Очистить", "Удалить всё?"):
+            self.objects = []
+            save_objects(self.objects)
+            self.refresh()
 
-    for i, t in enumerate(tasks):
-        create_card(i, t)
+    # ===== КООРДИНАТЫ =====
+    def to_screen(self, x, y):
+        return x * self.scale + self.pan_x, y * self.scale + self.pan_y
 
-    total = len(tasks)
-    done = sum(t["done"] for t in tasks)
-    percent = int(done / total * 100) if total else 0
+    def to_world(self, x, y):
+        return (x - self.pan_x) / self.scale, (y - self.pan_y) / self.scale
 
-    stats_var.set(f"Всего: {total} | Выполнено: {done} | {percent}%")
+    # ===== ЗУМ =====
+    def zoom(self, event):
+        if event.delta > 0:
+            self.scale *= 1.1
+        else:
+            self.scale /= 1.1
+        self.refresh()
 
-# ===== WINDOW =====
+    # ===== ПАНОРАМА =====
+    def pan_start(self, event):
+        self.last_x = event.x
+        self.last_y = event.y
+
+    def pan_move(self, event):
+        dx = event.x - self.last_x
+        dy = event.y - self.last_y
+        self.pan_x += dx
+        self.pan_y += dy
+        self.last_x = event.x
+        self.last_y = event.y
+        self.refresh()
+
+    # ===== КАРТА =====
+    def load_map(self):
+        path = filedialog.askopenfilename()
+        if not path:
+            return
+        try:
+            self.map_img = tk.PhotoImage(file=path)
+            self.refresh()
+        except:
+            messagebox.showerror("Ошибка", "Не удалось загрузить карту")
+
+    # ===== ОТРИСОВКА =====
+    def refresh(self):
+        self.canvas.delete("all")
+
+        # карта
+        if hasattr(self, "map_img"):
+            self.canvas.create_image(self.pan_x, self.pan_y, image=self.map_img, anchor="nw")
+
+        # объекты
+        for obj in self.objects:
+            sx, sy = self.to_screen(obj["x"], obj["y"])
+            color = TYPE_COLORS.get(obj["type"], "green")
+
+            r = obj["radius"] * self.scale
+
+            self.canvas.create_oval(
+                sx - r, sy - r, sx + r, sy + r,
+                outline=color
+            )
+
+            self.canvas.create_oval(
+                sx - 5, sy - 5, sx + 5, sy + 5,
+                fill=color
+            )
+
+            self.canvas.create_text(
+                sx + 10, sy,
+                text=obj["name"],
+                fill=TEXT
+            )
+
+
+# ===== ЗАПУСК =====
 root = tk.Tk()
-root.title("Task Manager")
-root.geometry("1100x800")
-root.configure(bg=COLORS["bg"])
-
-# ===== CENTER CONTAINER =====
-container = tk.Frame(root, bg=COLORS["card"], padx=25, pady=25)
-container.place(relx=0.5, rely=0.5, anchor="center", width=850, height=720)
-
-# TITLE
-tk.Label(container, text="Task Manager",
-         bg=COLORS["card"], fg=COLORS["text"],
-         font=("Segoe UI", 20, "bold")).pack(pady=10)
-
-# INPUT
-entry = tk.Entry(container, bg=COLORS["input"], fg=COLORS["text"],
-                 insertbackground="white", bd=0, font=("Segoe UI", 12))
-entry.pack(fill="x", pady=5)
-
-# DATE PICKER
-if HAS_CALENDAR:
-    date_entry = DateEntry(container, date_pattern="dd-mm-yyyy")
-else:
-    date_entry = tk.Entry(container)
-    date_entry.insert(0, "дд-мм-гггг")
-
-date_entry.pack(fill="x", pady=5)
-
-# SELECTORS
-category_var = tk.StringVar(value="Личное")
-priority_var = tk.StringVar(value="Средний")
-
-row = tk.Frame(container, bg=COLORS["card"])
-row.pack(pady=5)
-
-tk.OptionMenu(row, category_var, *CATEGORIES).pack(side="left", padx=5)
-tk.OptionMenu(row, priority_var, *PRIORITIES).pack(side="left", padx=5)
-
-# BUTTON
-tk.Button(container, text="Добавить",
-          bg=COLORS["accent"], fg="white",
-          bd=0, font=("Segoe UI", 12),
-          command=add_task).pack(fill="x", pady=10)
-
-# ===== SCROLLABLE TASKS =====
-canvas = tk.Canvas(container, bg=COLORS["card"], highlightthickness=0)
-scrollbar = tk.Scrollbar(container, orient="vertical", command=canvas.yview)
-
-inner_frame = tk.Frame(canvas, bg=COLORS["card"])
-
-inner_frame.bind(
-    "<Configure>",
-    lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
-)
-
-canvas.create_window((0, 0), window=inner_frame, anchor="nw")
-canvas.configure(yscrollcommand=scrollbar.set)
-
-canvas.pack(side="left", fill="both", expand=True)
-scrollbar.pack(side="right", fill="y")
-
-# STATS
-stats_var = tk.StringVar()
-tk.Label(container, textvariable=stats_var,
-         bg=COLORS["card"], fg=COLORS["muted"]).pack(pady=5)
-
-# START
-load_tasks()
+app = MapApp(root)
 root.mainloop()
