@@ -1,182 +1,191 @@
 import tkinter as tk
-from tkinter import filedialog, messagebox
+from tkinter import messagebox
 import json
 import os
 from datetime import datetime
 
-# ===== ФАЙЛ =====
-FILE_NAME = "objects.json"
+# ---------- CONFIG ----------
+FILE_NAME = "tasks.json"
+DATE_FORMAT = "%d-%m-%Y"
 
-# ===== ЦВЕТА =====
 BG = "#0f172a"
-PANEL = "#111827"
+CARD = "#1e293b"
+TASK_CARD = "#273449"
+INPUT = "#0b1220"
 ACCENT = "#6366f1"
+HOVER = "#4f46e5"
 TEXT = "#e2e8f0"
+MUTED = "#94a3b8"
+DANGER = "#ef4444"
 
-TYPE_COLORS = {
-    "Тип A": "#22c55e",
-    "Тип B": "#eab308",
-    "Тип C": "#ef4444",
-}
+CATEGORIES = ["Работа", "Личное", "Учёба"]
+PRIORITIES = ["Высокий", "Средний", "Низкий"]
 
-# ===== ДАННЫЕ =====
-def load_objects():
-    if not os.path.exists(FILE_NAME):
-        return []
-    try:
-        with open(FILE_NAME, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except:
-        return []
+tasks = []
+selected_task_id = None
 
-def save_objects(objects):
-    with open(FILE_NAME, "w", encoding="utf-8") as f:
-        json.dump(objects, f, ensure_ascii=False, indent=2)
-
-# ===== ПРИЛОЖЕНИЕ =====
-class MapApp:
-    def __init__(self, root):
-        self.root = root
-        self.root.title("Map Simulator")
-        self.root.state("zoomed")
-        self.root.configure(bg=BG)
-
-        self.scale = 1.0
-        self.pan_x = 0
-        self.pan_y = 0
-
-        self.objects = load_objects()
-        self.add_mode = True
-
-        self.build_ui()
-        self.bind_events()
-        self.refresh()
-
-    def build_ui(self):
-        self.toolbar = tk.Frame(self.root, bg=PANEL)
-        self.toolbar.pack(fill="x")
-
-        tk.Button(self.toolbar, text="Добавление ВКЛ/ВЫКЛ",
-                  command=self.toggle_add,
-                  bg=ACCENT, fg="white").pack(side="left", padx=5)
-
-        tk.Button(self.toolbar, text="Очистить",
-                  command=self.clear,
-                  bg=ACCENT, fg="white").pack(side="left", padx=5)
-
-        tk.Button(self.toolbar, text="Загрузить карту",
-                  command=self.load_map,
-                  bg=ACCENT, fg="white").pack(side="left", padx=5)
-
-        self.canvas = tk.Canvas(self.root, bg=BG)
-        self.canvas.pack(fill="both", expand=True)
-
-    def bind_events(self):
-        self.canvas.bind("<Button-1>", self.click)
-        self.canvas.bind("<MouseWheel>", self.zoom)
-        self.canvas.bind("<B2-Motion>", self.pan_move)
-        self.canvas.bind("<ButtonPress-2>", self.pan_start)
-
-    # ===== ЛОГИКА =====
-    def toggle_add(self):
-        self.add_mode = not self.add_mode
-
-    def click(self, event):
-        if not self.add_mode:
-            return
-
-        x, y = self.to_world(event.x, event.y)
-
-        self.objects.append({
-            "x": x,
-            "y": y,
-            "radius": 50,
-            "type": "Тип A",
-            "name": f"obj {len(self.objects)+1}"
-        })
-
-        save_objects(self.objects)
-        self.refresh()
-
-    def clear(self):
-        if messagebox.askyesno("Очистить", "Удалить всё?"):
-            self.objects = []
-            save_objects(self.objects)
-            self.refresh()
-
-    # ===== КООРДИНАТЫ =====
-    def to_screen(self, x, y):
-        return x * self.scale + self.pan_x, y * self.scale + self.pan_y
-
-    def to_world(self, x, y):
-        return (x - self.pan_x) / self.scale, (y - self.pan_y) / self.scale
-
-    # ===== ЗУМ =====
-    def zoom(self, event):
-        if event.delta > 0:
-            self.scale *= 1.1
-        else:
-            self.scale /= 1.1
-        self.refresh()
-
-    # ===== ПАНОРАМА =====
-    def pan_start(self, event):
-        self.last_x = event.x
-        self.last_y = event.y
-
-    def pan_move(self, event):
-        dx = event.x - self.last_x
-        dy = event.y - self.last_y
-        self.pan_x += dx
-        self.pan_y += dy
-        self.last_x = event.x
-        self.last_y = event.y
-        self.refresh()
-
-    # ===== КАРТА =====
-    def load_map(self):
-        path = filedialog.askopenfilename()
-        if not path:
-            return
+# ---------- DATA ----------
+def load_tasks():
+    global tasks
+    if os.path.exists(FILE_NAME):
         try:
-            self.map_img = tk.PhotoImage(file=path)
-            self.refresh()
+            with open(FILE_NAME, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            tasks = data if isinstance(data, list) else []
         except:
-            messagebox.showerror("Ошибка", "Не удалось загрузить карту")
+            tasks = []
 
-    # ===== ОТРИСОВКА =====
-    def refresh(self):
-        self.canvas.delete("all")
+def save_tasks():
+    with open(FILE_NAME, "w", encoding="utf-8") as f:
+        json.dump(tasks, f, ensure_ascii=False, indent=2)
 
-        # карта
-        if hasattr(self, "map_img"):
-            self.canvas.create_image(self.pan_x, self.pan_y, image=self.map_img, anchor="nw")
+def next_id():
+    return str(int(datetime.now().timestamp() * 1000000))
 
-        # объекты
-        for obj in self.objects:
-            sx, sy = self.to_screen(obj["x"], obj["y"])
-            color = TYPE_COLORS.get(obj["type"], "green")
+def parse_deadline(value):
+    try:
+        return datetime.strptime(value, DATE_FORMAT).date()
+    except:
+        return None
 
-            r = obj["radius"] * self.scale
+def is_overdue(task):
+    if task["done"]:
+        return False
+    d = parse_deadline(task["deadline"])
+    return d and d < datetime.now().date()
 
-            self.canvas.create_oval(
-                sx - r, sy - r, sx + r, sy + r,
-                outline=color
-            )
+# ---------- LOGIC ----------
+def add_or_update():
+    global selected_task_id
 
-            self.canvas.create_oval(
-                sx - 5, sy - 5, sx + 5, sy + 5,
-                fill=color
-            )
+    text = task_var.get().strip()
+    deadline = deadline_var.get().strip()
 
-            self.canvas.create_text(
-                sx + 10, sy,
-                text=obj["name"],
-                fill=TEXT
-            )
+    if not text:
+        messagebox.showwarning("Ошибка", "Введите задачу")
+        return
 
+    if not parse_deadline(deadline):
+        messagebox.showwarning("Ошибка", "Дата: дд-мм-гггг")
+        return
 
-# ===== ЗАПУСК =====
+    task = {
+        "id": selected_task_id or next_id(),
+        "text": text,
+        "deadline": deadline,
+        "done": False,
+        "category": category_var.get(),
+        "priority": priority_var.get(),
+    }
+
+    if selected_task_id:
+        for i, t in enumerate(tasks):
+            if t["id"] == selected_task_id:
+                task["done"] = t["done"]
+                tasks[i] = task
+    else:
+        tasks.append(task)
+
+    save_tasks()
+    clear_inputs()
+    refresh()
+
+def toggle_done(task_id):
+    for t in tasks:
+        if t["id"] == task_id:
+            t["done"] = not t["done"]
+    save_tasks()
+    refresh()
+
+def delete_task(task_id):
+    global tasks
+    tasks = [t for t in tasks if t["id"] != task_id]
+    save_tasks()
+    refresh()
+
+def clear_inputs():
+    global selected_task_id
+    selected_task_id = None
+    task_var.set("")
+    deadline_var.set("")
+    category_var.set("Личное")
+    priority_var.set("Средний")
+    add_btn.config(text="Добавить")
+
+def select_task(task):
+    global selected_task_id
+    selected_task_id = task["id"]
+
+    task_var.set(task["text"])
+    deadline_var.set(task["deadline"])
+    category_var.set(task["category"])
+    priority_var.set(task["priority"])
+
+    add_btn.config(text="Сохранить")
+
+# ---------- UI ----------
+def refresh():
+    for w in list_frame.winfo_children():
+        w.destroy()
+
+    for task in tasks:
+        create_card(task)
+
+def create_card(task):
+    color = HOVER if task["id"] == selected_task_id else TASK_CARD
+    title_color = DANGER if is_overdue(task) else TEXT
+
+    frame = tk.Frame(list_frame, bg=color, padx=10, pady=10)
+    frame.pack(fill="x", pady=4)
+
+    title = tk.Label(frame, text=task["text"], bg=color, fg=title_color, font=("Segoe UI", 12, "bold"))
+    title.pack(anchor="w")
+
+    meta = tk.Label(
+        frame,
+        text=f'{task["category"]} | {task["deadline"]} | {task["priority"]}',
+        bg=color,
+        fg=MUTED
+    )
+    meta.pack(anchor="w")
+
+    btns = tk.Frame(frame, bg=color)
+    btns.pack(anchor="e")
+
+    tk.Button(btns, text="✔", command=lambda: toggle_done(task["id"]), bg=ACCENT, fg="white").pack(side="left")
+    tk.Button(btns, text="✖", command=lambda: delete_task(task["id"]), bg=DANGER, fg="white").pack(side="left")
+
+    frame.bind("<Button-1>", lambda e: select_task(task))
+    title.bind("<Button-1>", lambda e: select_task(task))
+    meta.bind("<Button-1>", lambda e: select_task(task))
+
+# ---------- APP ----------
 root = tk.Tk()
-app = MapApp(root)
+root.title("Task Manager")
+root.geometry("700x700")
+root.configure(bg=BG)
+
+task_var = tk.StringVar()
+deadline_var = tk.StringVar()
+category_var = tk.StringVar(value="Личное")
+priority_var = tk.StringVar(value="Средний")
+
+container = tk.Frame(root, bg=CARD, padx=15, pady=15)
+container.pack(fill="both", expand=True, padx=20, pady=20)
+
+tk.Entry(container, textvariable=task_var, bg=INPUT, fg=TEXT).pack(fill="x", pady=5)
+tk.Entry(container, textvariable=deadline_var, bg=INPUT, fg=TEXT).pack(fill="x", pady=5)
+
+tk.OptionMenu(container, category_var, *CATEGORIES).pack(fill="x", pady=5)
+tk.OptionMenu(container, priority_var, *PRIORITIES).pack(fill="x", pady=5)
+
+add_btn = tk.Button(container, text="Добавить", command=add_or_update, bg=ACCENT, fg="white")
+add_btn.pack(fill="x", pady=10)
+
+list_frame = tk.Frame(container, bg=CARD)
+list_frame.pack(fill="both", expand=True)
+
+load_tasks()
+refresh()
+
 root.mainloop()
