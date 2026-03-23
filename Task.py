@@ -3,7 +3,13 @@ import os
 import tkinter as tk
 from datetime import datetime
 from tkinter import messagebox
-from tkcalendar import DateEntry
+
+# Попытка подключить календарь
+try:
+    from tkcalendar import DateEntry
+    HAS_CALENDAR = True
+except:
+    HAS_CALENDAR = False
 
 FILE_NAME = "tasks.json"
 DATE_FORMAT = "%d-%m-%Y"
@@ -49,14 +55,17 @@ def is_overdue(task):
 # ===== LOGIC =====
 def add_task():
     text = entry.get().strip()
+
     if not text:
         messagebox.showwarning("Ошибка", "Введите задачу")
         return
 
+    deadline = date_entry.get()
+
     task = {
         "text": text,
         "done": False,
-        "deadline": date_entry.get(),
+        "deadline": deadline,
         "category": category_var.get(),
         "priority": priority_var.get()
     }
@@ -146,7 +155,12 @@ entry = tk.Entry(container, bg=COLORS["input"], fg=COLORS["text"],
 entry.pack(fill="x", pady=5)
 
 # DATE PICKER
-date_entry = DateEntry(container, date_pattern="dd-mm-yyyy")
+if HAS_CALENDAR:
+    date_entry = DateEntry(container, date_pattern="dd-mm-yyyy")
+else:
+    date_entry = tk.Entry(container)
+    date_entry.insert(0, "дд-мм-гггг")
+
 date_entry.pack(fill="x", pady=5)
 
 # SELECTORS
