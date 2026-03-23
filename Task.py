@@ -4,7 +4,6 @@ import tkinter as tk
 from datetime import datetime
 from tkinter import messagebox
 
-# ===== НАСТРОЙКИ =====
 FILE_NAME = "tasks.json"
 DATE_FORMAT = "%d-%m-%Y"
 
@@ -93,12 +92,12 @@ def delete_task(i):
 
 # ===== UI =====
 def clear_tasks():
-    for w in task_container.winfo_children():
+    for w in inner_frame.winfo_children():
         w.destroy()
 
 def create_card(i, task):
-    frame = tk.Frame(task_container, bg="#273449", padx=14, pady=12)
-    frame.pack(fill="x", pady=6)
+    frame = tk.Frame(inner_frame, bg="#273449", padx=14, pady=12)
+    frame.pack(fill="x", pady=6, padx=10)
 
     def on_enter(e):
         frame.configure(bg=COLORS["hover"])
@@ -111,21 +110,14 @@ def create_card(i, task):
 
     color = COLORS["danger"] if is_overdue(task) else COLORS["text"]
 
-    tk.Label(
-        frame,
-        text=task["text"],
-        bg=frame["bg"],
-        fg=color,
-        font=("Segoe UI", 13, "bold"),
-        anchor="w"
-    ).pack(fill="x")
+    tk.Label(frame, text=task["text"],
+             bg=frame["bg"], fg=color,
+             font=("Segoe UI", 13, "bold"),
+             anchor="w").pack(fill="x")
 
-    tk.Label(
-        frame,
-        text=f"{task['category']} | {task['deadline']} | {task['priority']}",
-        bg=frame["bg"],
-        fg=COLORS["muted"]
-    ).pack(fill="x", pady=(2, 6))
+    tk.Label(frame,
+             text=f"{task['category']} | {task['deadline']} | {task['priority']}",
+             bg=frame["bg"], fg=COLORS["muted"]).pack(fill="x", pady=(2, 6))
 
     btns = tk.Frame(frame, bg=frame["bg"])
     btns.pack(anchor="e")
@@ -154,34 +146,18 @@ root.title("Task Manager")
 root.geometry("1100x800")
 root.configure(bg=COLORS["bg"])
 
-# ===== ЦЕНТРАЛЬНАЯ КАРТОЧКА =====
-container = tk.Frame(
-    root,
-    bg=COLORS["card"],
-    padx=25,
-    pady=25,
-    highlightthickness=1,
-    highlightbackground="#334155"
-)
-
+container = tk.Frame(root, bg=COLORS["card"], padx=25, pady=25)
 container.place(relx=0.5, rely=0.5, anchor="center", width=800, height=700)
 
-# ===== TITLE =====
-tk.Label(
-    container,
-    text="Task Manager",
-    bg=COLORS["card"],
-    fg=COLORS["text"],
-    font=("Segoe UI", 20, "bold")
-).pack(pady=(0, 15))
+tk.Label(container, text="Task Manager",
+         bg=COLORS["card"], fg=COLORS["text"],
+         font=("Segoe UI", 20, "bold")).pack(pady=10)
 
-# ===== INPUTS =====
 entry = tk.Entry(container, bg=COLORS["input"], fg=COLORS["text"],
-                 insertbackground="white", bd=0, font=("Segoe UI", 12))
+                 insertbackground="white", bd=0)
 entry.pack(fill="x", pady=5)
 
-deadline_entry = tk.Entry(container, bg=COLORS["input"], fg=COLORS["text"],
-                          bd=0, font=("Segoe UI", 12))
+deadline_entry = tk.Entry(container, bg=COLORS["input"], fg=COLORS["text"], bd=0)
 deadline_entry.pack(fill="x", pady=5)
 deadline_entry.insert(0, "дд-мм-гггг")
 
@@ -189,35 +165,36 @@ category_var = tk.StringVar(value="Личное")
 priority_var = tk.StringVar(value="Средний")
 
 row = tk.Frame(container, bg=COLORS["card"])
-row.pack(fill="x", pady=5)
+row.pack(pady=5)
 
 tk.OptionMenu(row, category_var, *CATEGORIES).pack(side="left", padx=5)
 tk.OptionMenu(row, priority_var, *PRIORITIES).pack(side="left", padx=5)
 
-tk.Button(
-    container,
-    text="Добавить",
-    bg=COLORS["accent"],
-    fg="white",
-    bd=0,
-    font=("Segoe UI", 12),
-    command=add_task
-).pack(fill="x", pady=10)
+tk.Button(container, text="Добавить",
+          bg=COLORS["accent"], fg="white",
+          bd=0, command=add_task).pack(fill="x", pady=10)
 
-# ===== TASKS =====
-task_container = tk.Frame(container, bg=COLORS["card"])
-task_container.pack(fill="both", expand=True, pady=10)
+# ===== СКРОЛЛ =====
+canvas = tk.Canvas(container, bg=COLORS["card"], highlightthickness=0)
+scrollbar = tk.Scrollbar(container, orient="vertical", command=canvas.yview)
+
+inner_frame = tk.Frame(canvas, bg=COLORS["card"])
+
+inner_frame.bind(
+    "<Configure>",
+    lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+)
+
+canvas.create_window((0, 0), window=inner_frame, anchor="nw")
+canvas.configure(yscrollcommand=scrollbar.set)
+
+canvas.pack(side="left", fill="both", expand=True)
+scrollbar.pack(side="right", fill="y")
 
 # ===== STATS =====
 stats_var = tk.StringVar()
-tk.Label(
-    container,
-    textvariable=stats_var,
-    bg=COLORS["card"],
-    fg=COLORS["muted"],
-    font=("Segoe UI", 11)
-).pack(pady=5)
+tk.Label(container, textvariable=stats_var,
+         bg=COLORS["card"], fg=COLORS["muted"]).pack(pady=5)
 
-# ===== СТАРТ =====
 load_tasks()
 root.mainloop()
