@@ -2,7 +2,6 @@ import tkinter as tk
 from tkinter import messagebox
 import json
 import os
-from datetime import datetime
 
 FILE_NAME = "tasks.json"
 
@@ -78,8 +77,6 @@ def toggle_done():
     save_tasks()
     update_listbox()
 
-
-
 def prevent_close():
     messagebox.showinfo("Информация", "Закрытие окна отключено")
 
@@ -109,7 +106,7 @@ listbox.pack(pady=10)
 # загрузка задач
 load_tasks()
 
-# блокируем закрытие окна по кнопке X
+# блокируем закрытие окна
 root.protocol("WM_DELETE_WINDOW", prevent_close)
 
 root.mainloop()
